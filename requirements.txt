@@ -1,0 +1,4 @@
+Flask
+twilio
+google-generativeai
+gunicorn

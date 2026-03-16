@@ -16,6 +16,11 @@ twilio_client = Client(twilio_sid, twilio_auth) if twilio_sid and twilio_auth el
 model = genai.GenerativeModel('gemini-2.5-flash')
 app = Flask(__name__)
 
+# --- נתיב "פינג" להשארת השרת ער (בשביל UptimeRobot/Cron-job) ---
+@app.route('/', methods=['GET'])
+def ping():
+    return "I am awake!", 200
+
 # --- הנתיב החדש: קליטת ליד מ-Make ויזימת שיחה ---
 @app.route('/new-lead', methods=['POST'])
 def handle_new_lead():

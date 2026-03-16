@@ -21,17 +21,21 @@ app = Flask(__name__)
 @app.route('/webhook', methods=['POST'])
 def webhook():
     incoming_msg = request.values.get('Body', '')
-    
-    # שליחת ההודעה לתוך ה-session הקיים של הצ'אט
-    response = chat.send_message(incoming_msg)
-    ai_answer = response.text
+    sender_phone = request.values.get('From', '') # טוויליו שולח לנו מי שלח את ההודעה
 
-    # החזרת התשובה לוואטסאפ
-    resp = MessagingResponse()
-    msg = resp.message()
-    msg.body(ai_answer)
+    # --- הניתוב החכם ---
+    # שים פה את המספר האמיתי של לימור (למשל: whatsapp:+972501234567)
+    if sender_phone == 'whatsapp:+972_המספר_של_לימור': 
+        
+        # הפרומפט של לימור
+        bot_persona = """אתה עוזר וירטואלי חכם של קליניקת קוסמטיקה בניהולה של לימור. 
+        המומחיות של הקליניקה היא טיפולי אקנה, מיצוק ואנטי אייג'ינג. 
+        הטון שלך צריך להיות רך, סבלני, קליני ומרגיע. 
+        המטרה שלך היא לענות על שאלות, להבין מה שגרת הטיפוח של הלקוחה, ולאסוף פרטים לתיאום תור."""
+        
+    else:
+        # הפרומפט של איריס (יעבוד לה, לך, ולכל מספר אחר שיבדוק את המערכת)
+        bot_persona = """אתה עוזר וירטואלי של סטודיו בראשית... (תדביק פה את ההוראות של איריס שכבר עובדות לך)"""
 
-    return str(resp)
-
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    # --- מכאן זה הקוד הרגיל שלך ששולח את bot_persona ואת incoming_msg למודל של ג'מיני ---
+    # ...

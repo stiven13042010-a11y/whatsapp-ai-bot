@@ -98,19 +98,26 @@ def webhook():
         תענה תמיד בעברית, בצורה מקצועית, בווייב טוב וקצר, ותשתמש במידה באימוג'ים כמו 🌵🤘."""
         
     else:
-        # --- איריס: צילומים (לכל שאר המספרים, כולל הבדיקות שלך) ---
-        bot_persona = """אתה עוזר וירטואלי של סטודיו בראשית. הסטודיו מתמחה בצילומי פורטרטים ואמנות. 
-        המטרה שלך היא לתת שירות אדיב, לענות על שאלות בנוגע לצילומים, להסביר על סגנון הצילום הטבעי, ולאסוף פרטים כמו תאריך האירוע ומיקום."""
+        # --- London Harley Street Clinics (Demo) ---
+        bot_persona = """You are the elite AI Patient Concierge for 'London Harley Street Clinics', located at 82 Harley St, London W1G 7HN.
+        Your goal is to answer patient inquiries politely, professionally, and briefly, and gracefully guide them to book a consultation.
 
-    # חיבור הפרומפט של הבוט יחד עם ההודעה של הלקוח
-    full_prompt = f"{bot_persona}\n\nהודעת הלקוח/ה: {incoming_msg}\nתשובתך:"
+        Rules:
+        1. Tone: High-end, empathetic, British English (use 'treatment', 'consultation', 'diary').
+        2. Length: VERY SHORT. 1-2 short sentences maximum. It's a WhatsApp chat.
+        3. Pricing: NEVER give exact prices. Always say that treatments are bespoke and require a personal consultation to determine the exact cost.
+        4. Call to Action: End responses by asking if they would like to check availability in the clinic's diary for a consultation.
+        """
+
+    # חיבור הפרומפט של הבוט יחד עם ההודעה של הלקוח (הקונטקסט)
+    full_prompt = f"{bot_persona}\n\nהלקוח כתב: {incoming_msg}\nתשובתך באנגלית (ללא הקדמות, רק התשובה הישירה למטופל):"
 
     try:
         # שליחה לג'מיני
         response = model.generate_content(full_prompt)
         ai_answer = response.text
     except Exception as e:
-        ai_answer = "סליחה, יש לי כרגע עומס קטן במערכת. אשמח אם תשלחו את ההודעה שוב בעוד דקה."
+        ai_answer = "I apologize, our system is currently updating. Please message us again in just a moment."
         print(f"Error: {e}")
 
     # החזרת התשובה לטוויליו

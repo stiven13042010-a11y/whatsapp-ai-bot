@@ -3,6 +3,7 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.rest import Client
 import google.generativeai as genai
+from datetime import datetime
 
 # משיכת המפתחות מהסביבה (Render)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -59,6 +60,19 @@ def handle_new_lead():
 def webhook():
     incoming_msg = request.values.get('Body', '')
     sender_phone = request.values.get('From', '')
+    num_media = request.values.get('NumMedia', '0') # בדיקה אם צורף קובץ/תמונה
+
+    # --- חסימת תמונות/קול (Media Handling) ---
+    # הלקוח שלח תמונה במקום טקסט? הבוט עוצר הכל ועונה אוטומטית.
+    if int(num_media) > 0:
+        resp = MessagingResponse()
+        msg = resp.message()
+        if sender_phone == 'whatsapp:+972547448727' or sender_phone == 'whatsapp:+972509797651' or sender_phone == 'whatsapp:+972505486868':
+            msg.body("תודה על התמונה! כרגע אני בוט מבוסס טקסט. אעביר את התמונה לצוות שיחזור אלייך בהקדם.")
+        else:
+            # מענה לקליניקה בלונדון
+            msg.body("Thank you for the image. For privacy and medical accuracy, we do not analyze photos over WhatsApp. Please save this for your personal consultation with our specialists.")
+        return str(resp)
 
     # --- ניהול זיכרון שיחה ---
     if sender_phone not in conversation_history:
@@ -67,16 +81,20 @@ def webhook():
     # הוספת הודעת הלקוח החדשה להיסטוריה
     conversation_history[sender_phone].append(f"Patient: {incoming_msg}")
 
-    # שמירה על ה-4 הודעות האחרונות בלבד (כדי לא להעמיס על הזיכרון)
+    # שמירה על ה-4 הודעות האחרונות בלבד
     if len(conversation_history[sender_phone]) > 4:
         conversation_history[sender_phone].pop(0)
 
     # הפיכת הרשימה לטקסט רציף
     history_text = "\n".join(conversation_history[sender_phone])
 
+    # --- משיכת הזמן הנוכחי ---
+    # זה נותן לג'מיני מודעות לזמן ("היום יום חמישי")
+    current_time = datetime.now().strftime("%A, %B %d, %Y, %H:%M")
+
     # --- הניתוב החכם (Routing) ---
     if sender_phone == 'whatsapp:+972547448727':
-        # --- ספיר חורש: סטודיו לפילאטיס מכשירים ---
+        # ספיר חורש
         bot_persona = """אתה נציג שירות וירטואלי של 'ספיר חורש - סטודיו לפילאטיס מכשירים בגבעתיים'.
 המטרה שלך: לענות לנשים שפונות לוואטסאפ, לתת פרטים בסיסיים על הסטודיו, ולתאם להן אימון ניסיון.
 
@@ -87,7 +105,7 @@ def webhook():
 4. שמור על טון מקצועי, מזמין, נעים ובגובה העיניים."""
 
     elif sender_phone == 'whatsapp:+972509797651': 
-        # --- לימור: קוסמטיקה ---
+        # לימור
         bot_persona = """אתה העוזר הווירטואלי החכם של קליניקת הקוסמטיקה והאסתטיקה המתקדמת בניהולה של לימור.
 
 המטרה שלך:
@@ -109,14 +127,13 @@ def webhook():
 3. התנגדות מחיר: אם שואלים כמה עולה טיפול, אל תזרוק מספרים. תסביר שזה נקבע רק לאחר אבחון מקצועי."""
 
     elif sender_phone == 'whatsapp:+972505486868':
-        # --- קקטוס קעקועים ---
+        # קקטוס
         bot_persona = """אתה נציג שירות וירטואלי מקצועי וקול של סטודיו 'קקטוס קעקועים ופירסינג' בפתח תקווה (רחוב אודם 11). 
         המטרה שלך היא לענות ללקוחות שפונים בוואטסאפ, לתת מידע על קעקועים, סוגי פירסינג, הנחיות לפני הגעה, ולעזור לקבוע תור. 
         תענה תמיד בעברית, בצורה מקצועית, בווייב טוב וקצר, ותשתמש במידה באימוג'ים כמו 🌵🤘."""
         
     else:
-        # --- London Harley Street Clinics (Full Trial Version) ---
-       # --- London Harley Street Clinics (Full Trial Version) ---
+        # --- London Harley Street Clinics (Ultimate Production Version) ---
         bot_persona = """You are the elite AI Patient Concierge for 'London Harley Street Clinics', located at 82 Harley St, London W1G 7HN. 
         Your goal is to answer patient inquiries politely, professionally, and briefly, and gracefully guide them to book a consultation.
 
@@ -133,10 +150,14 @@ def webhook():
         4. Booking Flow: 
            - If the user hasn't provided a specific time yet, ask what day and time works best for them to check the Pabau diary.
            - If the user ALREADY provided a day and time, confirm it politely and state that the reception team will now lock this slot in the Pabau diary and contact them shortly to confirm. DO NOT ask them if they want to check availability again.
+        5. Cancellations/Rescheduling: If a user wants to cancel or change an appointment, state that you are notifying the reception team to handle this immediately.
+        6. Medical Emergencies: If a patient describes severe pain, heavy bleeding, or a life-threatening emergency, IMMEDIATELY instruct them to call 999 or go to the nearest A&E hospital.
+        7. Boundaries: NEVER answer questions unrelated to the clinic, its services, or aesthetic medicine. If asked about politics, general knowledge, or other random topics, politely decline and steer the conversation back to the clinic.
+        8. Human Escalation: If the patient asks to speak to a human, manager, or real person, immediately apologize and state that a human receptionist will take over the chat shortly.
         """
 
-    # --- בניית הפרומפט הסופי עם ההיסטוריה ---
-    full_prompt = f"{bot_persona}\n\nRecent Conversation History:\n{history_text}\n\nAI Concierge (Your response):"
+    # --- בניית הפרומפט הסופי עם ההיסטוריה והזמן ---
+    full_prompt = f"{bot_persona}\n\nCurrent Time Reference: {current_time}\n\nRecent Conversation History:\n{history_text}\n\nAI Concierge (Your response):"
 
     try:
         # שליחה לג'מיני

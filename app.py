@@ -16,6 +16,9 @@ twilio_client = Client(twilio_sid, twilio_auth) if twilio_sid and twilio_auth el
 model = genai.GenerativeModel('gemini-2.5-flash')
 app = Flask(__name__)
 
+# --- משתנה גלובלי לניהול זיכרון השיחות ---
+conversation_history = {}
+
 # --- נתיב "פינג" להשארת השרת ער (בשביל UptimeRobot/Cron-job) ---
 @app.route('/', methods=['GET'])
 def ping():
@@ -56,6 +59,20 @@ def handle_new_lead():
 def webhook():
     incoming_msg = request.values.get('Body', '')
     sender_phone = request.values.get('From', '')
+
+    # --- ניהול זיכרון שיחה ---
+    if sender_phone not in conversation_history:
+        conversation_history[sender_phone] = []
+    
+    # הוספת הודעת הלקוח החדשה להיסטוריה
+    conversation_history[sender_phone].append(f"Patient: {incoming_msg}")
+
+    # שמירה על ה-4 הודעות האחרונות בלבד (כדי לא להעמיס על הזיכרון)
+    if len(conversation_history[sender_phone]) > 4:
+        conversation_history[sender_phone].pop(0)
+
+    # הפיכת הרשימה לטקסט רציף
+    history_text = "\n".join(conversation_history[sender_phone])
 
     # --- הניתוב החכם (Routing) ---
     if sender_phone == 'whatsapp:+972547448727':
@@ -115,13 +132,17 @@ def webhook():
         4. Call to Action: End EVERY response by asking if they would like to check availability in our clinic's Pabau diary for a consultation.
         """
 
-    # חיבור הפרומפט של הבוט יחד עם ההודעה של הלקוח (הקונטקסט)
-    full_prompt = f"{bot_persona}\n\nהלקוח כתב: {incoming_msg}\nתשובתך באנגלית (ללא הקדמות, רק התשובה הישירה למטופל):"
+    # --- בניית הפרומפט הסופי עם ההיסטוריה ---
+    full_prompt = f"{bot_persona}\n\nRecent Conversation History:\n{history_text}\n\nAI Concierge (Your response):"
 
     try:
         # שליחה לג'מיני
         response = model.generate_content(full_prompt)
         ai_answer = response.text
+        
+        # שמירת תשובת הבוט בהיסטוריה
+        conversation_history[sender_phone].append(f"AI: {ai_answer}")
+        
     except Exception as e:
         ai_answer = "I apologize, our system is currently updating. Please message us again in just a moment."
         print(f"Error: {e}")
